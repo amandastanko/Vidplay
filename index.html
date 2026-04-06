@@ -36,6 +36,7 @@
       position: relative;
     }
 
+    /* ── Feed switcher ── */
     #feedSwitcher {
       padding: 12px 16px;
       background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
@@ -82,7 +83,125 @@
 
     #videoPlayerDiv { flex: 1; overflow: hidden; }
 
-    #statusOverlay {
+    /* ── Auth screen ── */
+    #authScreen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0f0f1a;
+      z-index: 200;
+      transition: opacity 0.5s ease;
+    }
+
+    #authScreen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .auth-card {
+      background: #1a1a2e;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 32px;
+      max-width: 480px;
+      width: 90%;
+    }
+
+    .auth-card h2 {
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .auth-card p {
+      color: rgba(255, 255, 255, 0.45);
+      font-size: 13px;
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+
+    .auth-card a {
+      color: #4fc3f7;
+      text-decoration: none;
+    }
+
+    .auth-card a:hover {
+      text-decoration: underline;
+    }
+
+    .auth-card ol {
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 12px;
+      line-height: 1.8;
+      margin: 0 0 20px 20px;
+    }
+
+    .auth-card ol code {
+      background: rgba(255, 255, 255, 0.06);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    #tokenInput {
+      width: 100%;
+      padding: 10px 14px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      color: rgba(255, 255, 255, 0.8);
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 12px;
+      outline: none;
+      margin-bottom: 14px;
+      transition: border-color 0.2s;
+    }
+
+    #tokenInput:focus {
+      border-color: rgba(79, 195, 247, 0.5);
+    }
+
+    #tokenInput::placeholder {
+      color: rgba(255, 255, 255, 0.2);
+    }
+
+    #connectBtn {
+      width: 100%;
+      padding: 11px;
+      background: rgba(79, 195, 247, 0.15);
+      border: 1px solid rgba(79, 195, 247, 0.4);
+      border-radius: 8px;
+      color: #4fc3f7;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    #connectBtn:hover {
+      background: rgba(79, 195, 247, 0.25);
+    }
+
+    #connectBtn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    #authError {
+      color: #ef5350;
+      font-size: 12px;
+      margin-top: 10px;
+      display: none;
+    }
+
+    /* ── Loading overlay ── */
+    #loadingOverlay {
       position: absolute;
       inset: 0;
       display: flex;
@@ -93,12 +212,12 @@
       transition: opacity 0.6s ease;
     }
 
-    #statusOverlay.hidden {
+    #loadingOverlay.hidden {
       opacity: 0;
       pointer-events: none;
     }
 
-    .status-content { text-align: center; max-width: 400px; padding: 20px; }
+    .loading-content { text-align: center; }
 
     .loading-spinner {
       width: 36px; height: 36px;
@@ -111,33 +230,10 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .status-content p {
+    .loading-content p {
       color: rgba(255, 255, 255, 0.5);
       font-size: 13px;
-      line-height: 1.6;
     }
-
-    #debugLog {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      max-height: 200px;
-      overflow-y: auto;
-      background: rgba(0, 0, 0, 0.85);
-      padding: 10px 14px;
-      font-family: "SF Mono", "Fira Code", monospace;
-      font-size: 11px;
-      line-height: 1.6;
-      color: #aaa;
-      z-index: 9999;
-      border-top: 1px solid rgba(79, 195, 247, 0.3);
-    }
-
-    #debugLog .log-ok { color: #66bb6a; }
-    #debugLog .log-warn { color: #ffa726; }
-    #debugLog .log-err { color: #ef5350; }
-    #debugLog .log-info { color: #4fc3f7; }
   </style>
 </head>
 <body>
@@ -159,92 +255,121 @@
     </div>
     <div id="videoPlayerDiv"></div>
 
-    <div id="statusOverlay">
-      <div class="status-content">
+    <!-- Auth screen -->
+    <div id="authScreen">
+      <div class="auth-card">
+        <h2>Connect to Video Server</h2>
+        <p>This app requires a token from the GeoXC Enterprise portal.</p>
+        <ol>
+          <li>Open the <a href="https://geoxc-ecs.esri.com/portal/sharing/rest/generateToken" target="_blank">Token Generator</a></li>
+          <li>Sign in with your portal credentials</li>
+          <li>Set <strong>Webapp URL</strong> to: <code>https://amandastanko.github.io</code></li>
+          <li>Click <strong>Generate Token</strong></li>
+          <li>Copy and paste the token below</li>
+        </ol>
+        <input type="text" id="tokenInput" placeholder="Paste your token here…" autocomplete="off" />
+        <button id="connectBtn">Connect</button>
+        <p id="authError"></p>
+      </div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div id="loadingOverlay" class="hidden">
+      <div class="loading-content">
         <div class="loading-spinner"></div>
-        <p id="statusMessage">Initializing&hellip;</p>
+        <p id="statusMessage">Loading video feeds…</p>
       </div>
     </div>
   </div>
 
-  <div id="debugLog"></div>
-
   <script type="module">
-    const logEl = document.getElementById("debugLog");
-    function log(msg, type = "info") {
-      const span = document.createElement("div");
-      span.className = "log-" + type;
-      span.textContent = "[" + new Date().toLocaleTimeString() + "] " + msg;
-      logEl.appendChild(span);
-      logEl.scrollTop = logEl.scrollHeight;
-      console.log("[VideoPlayer]", msg);
-    }
+    const { default: esriConfig } = await import("https://js.arcgis.com/4.32/@arcgis/core/config.js");
+    const { default: IdentityManager } = await import("https://js.arcgis.com/4.32/@arcgis/core/identity/IdentityManager.js");
+    const { default: Credential } = await import("https://js.arcgis.com/4.32/@arcgis/core/identity/Credential.js");
+    const { default: Map } = await import("https://js.arcgis.com/4.32/@arcgis/core/Map.js");
+    const { default: MapView } = await import("https://js.arcgis.com/4.32/@arcgis/core/views/MapView.js");
+    const { default: VideoLayer } = await import("https://js.arcgis.com/4.32/@arcgis/core/layers/VideoLayer.js");
+    const { default: VideoPlayer } = await import("https://js.arcgis.com/4.32/@arcgis/core/widgets/VideoPlayer.js");
 
+    const portalUrl = "https://geoxc-ecs.esri.com/portal";
+    const videoServerUrl = "https://geoxc-ecs-video.esri.com/server";
+
+    esriConfig.portalUrl = portalUrl;
+
+    // ── UI references ──
+    const authScreen = document.getElementById("authScreen");
+    const loadingOverlay = document.getElementById("loadingOverlay");
     const statusMsg = document.getElementById("statusMessage");
-    const overlay = document.getElementById("statusOverlay");
+    const tokenInput = document.getElementById("tokenInput");
+    const connectBtn = document.getElementById("connectBtn");
+    const authError = document.getElementById("authError");
 
-    log("Starting imports…");
+    // ── Connect button handler ──
+    connectBtn.addEventListener("click", handleConnect);
+    tokenInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") handleConnect();
+    });
 
-    try {
-      const { default: esriConfig } = await import("https://js.arcgis.com/4.32/@arcgis/core/config.js");
-      const { default: IdentityManager } = await import("https://js.arcgis.com/4.32/@arcgis/core/identity/IdentityManager.js");
-      const { default: OAuthInfo } = await import("https://js.arcgis.com/4.32/@arcgis/core/identity/OAuthInfo.js");
-      const { default: ServerInfo } = await import("https://js.arcgis.com/4.32/@arcgis/core/identity/ServerInfo.js");
-      const { default: Map } = await import("https://js.arcgis.com/4.32/@arcgis/core/Map.js");
-      const { default: MapView } = await import("https://js.arcgis.com/4.32/@arcgis/core/views/MapView.js");
-      const { default: VideoLayer } = await import("https://js.arcgis.com/4.32/@arcgis/core/layers/VideoLayer.js");
-      const { default: VideoPlayer } = await import("https://js.arcgis.com/4.32/@arcgis/core/widgets/VideoPlayer.js");
-
-      log("All modules imported", "ok");
-
-      // ──────────────────────────────────────────
-      // Authentication
-      // Portal: https://geoxc-ecs.esri.com/portal
-      // Video Server: https://geoxc-ecs-video.esri.com/server
-      // ──────────────────────────────────────────
-
-      const portalUrl = "https://geoxc-ecs.esri.com/portal";
-      const videoServerUrl = "https://geoxc-ecs-video.esri.com/server";
-
-      // Point the SDK at the Enterprise portal
-      esriConfig.portalUrl = portalUrl;
-
-      // Register the video server as federated with the portal
-      const serverInfo = new ServerInfo({
-        server: videoServerUrl,
-        tokenServiceUrl: portalUrl + "/sharing/rest/generateToken",
-        hasServer: true
-      });
-      IdentityManager.registerServers([serverInfo]);
-
-      log("Portal URL set: " + portalUrl, "info");
-      log("Video server registered with portal token service", "info");
-
-      // Request credentials against the portal
-      log("Requesting portal credentials…", "info");
-      statusMsg.textContent = "Signing in to portal…";
-
-      try {
-        const credential = await IdentityManager.getCredential(portalUrl + "/sharing");
-        log("Portal auth success! User: " + (credential.userId || "unknown"), "ok");
-        log("Token preview: " + credential.token.substring(0, 25) + "…", "ok");
-
-        // Now get a credential for the video server using the portal token
-        log("Requesting video server credential…", "info");
-        try {
-          const videoCredential = await IdentityManager.getCredential(videoServerUrl + "/rest/services");
-          log("Video server auth success! Token: " + videoCredential.token.substring(0, 25) + "…", "ok");
-        } catch (ve) {
-          log("Video server credential: " + ve.message + " (may use portal token)", "warn");
-        }
-      } catch (err) {
-        log("Portal auth failed: " + err.message, "err");
-        log("Attempting to continue without auth…", "warn");
+    async function handleConnect() {
+      const token = tokenInput.value.trim();
+      if (!token) {
+        showError("Please paste a token.");
+        return;
       }
 
-      // ── Create layers ──
-      log("Creating VideoLayers…", "info");
-      statusMsg.textContent = "Loading video feeds…";
+      connectBtn.disabled = true;
+      connectBtn.textContent = "Connecting…";
+      authError.style.display = "none";
+
+      try {
+        // Register the token for both the portal and the video server
+        const portalCredential = new Credential({
+          userId: "user",
+          server: portalUrl + "/sharing/rest",
+          token: token
+        });
+
+        const videoCredential = new Credential({
+          userId: "user",
+          server: videoServerUrl + "/rest/services",
+          token: token
+        });
+
+        IdentityManager.registerToken(portalCredential.toJSON());
+        IdentityManager.registerToken(videoCredential.toJSON());
+
+        // Quick test: try to fetch the video service metadata
+        const testUrl = videoServerUrl + "/rest/services/Collaboration_Table/VideoServer?f=json&token=" + token;
+        const resp = await fetch(testUrl);
+        const data = await resp.json();
+
+        if (data.error) {
+          throw new Error(data.error.message || "Token rejected by Video Server");
+        }
+
+        console.log("Video service metadata:", data);
+
+        // Token works — proceed to load the player
+        authScreen.classList.add("hidden");
+        loadingOverlay.classList.remove("hidden");
+        await initPlayer();
+
+      } catch (err) {
+        console.error("Connection error:", err);
+        showError("Failed: " + err.message);
+        connectBtn.disabled = false;
+        connectBtn.textContent = "Connect";
+      }
+    }
+
+    function showError(msg) {
+      authError.textContent = msg;
+      authError.style.display = "block";
+    }
+
+    // ── Initialize the video player ──
+    async function initPlayer() {
+      statusMsg.textContent = "Loading Collaboration video…";
 
       const collaborationLayer = new VideoLayer({
         url: videoServerUrl + "/rest/services/Collaboration_Table/VideoServer",
@@ -258,9 +383,6 @@
         autoplay: true
       });
 
-      log("VideoLayers created", "ok");
-
-      // ── Map & View ──
       const map = new Map({
         basemap: "dark-gray-vector",
         layers: [collaborationLayer]
@@ -274,52 +396,22 @@
         ui: { components: [] }
       });
 
-      log("Waiting for MapView…", "info");
-      statusMsg.textContent = "Initializing map view…";
+      await view.when();
 
       try {
-        await Promise.race([
-          view.when(),
-          new Promise((_, rej) => setTimeout(() => rej(new Error("MapView timed out (15s)")), 15000))
-        ]);
-        log("MapView ready. Size: " + view.width + "x" + view.height, "ok");
-      } catch (e) {
-        log("MapView: " + e.message, "err");
-      }
+        await collaborationLayer.when();
+        console.log("Layer loaded. Duration:", collaborationLayer.duration);
 
-      log("Waiting for Collaboration VideoLayer…", "info");
-      statusMsg.textContent = "Loading Collaboration video…";
-
-      try {
-        await Promise.race([
-          collaborationLayer.when(),
-          new Promise((_, rej) => setTimeout(() => rej(new Error("VideoLayer timed out (30s)")), 30000))
-        ]);
-        log("Collaboration layer loaded!", "ok");
-        log("  Type: " + collaborationLayer.type, "info");
-        log("  Duration: " + collaborationLayer.duration + "s", "info");
-        log("  Extent: " + JSON.stringify(collaborationLayer.fullExtent?.toJSON()), "info");
-        log("  Load status: " + collaborationLayer.loadStatus, "info");
-      } catch (e) {
-        log("Collaboration layer: " + e.message, "err");
-        if (collaborationLayer.loadError) {
-          log("  Detail: " + JSON.stringify(collaborationLayer.loadError.message), "err");
-        }
-        log("  Load status: " + collaborationLayer.loadStatus, "warn");
-      }
-
-      if (collaborationLayer.fullExtent) {
-        log("Zooming to extent…", "info");
-        try {
+        if (collaborationLayer.fullExtent) {
           await view.goTo(collaborationLayer.fullExtent.expand(1.5));
-          log("View extent updated", "ok");
-        } catch (e) {
-          log("goTo: " + e.message, "warn");
         }
+      } catch (e) {
+        console.error("Layer load error:", e);
+        statusMsg.textContent = "Video layer failed to load.";
+        return;
       }
 
-      log("Creating VideoPlayer widget…", "info");
-      statusMsg.textContent = "Starting video player…";
+      statusMsg.textContent = "Starting player…";
 
       const videoPlayer = new VideoPlayer({
         layer: collaborationLayer,
@@ -327,8 +419,7 @@
         container: "videoPlayerDiv"
       });
 
-      log("VideoPlayer created!", "ok");
-      overlay.classList.add("hidden");
+      loadingOverlay.classList.add("hidden");
 
       // ── Feed switching ──
       let activeFeed = "collaboration";
@@ -339,7 +430,6 @@
 
       async function switchFeed(key) {
         if (key === activeFeed) return;
-        log("Switching to: " + key, "info");
 
         const oldLayer = getLayer(activeFeed);
         const newLayer = getLayer(key);
@@ -349,12 +439,12 @@
 
         try {
           await newLayer.when();
-          log(key + " layer loaded", "ok");
         } catch (e) {
-          log(key + " layer failed: " + e.message, "err");
+          console.error("Layer switch error:", e);
         }
 
         videoPlayer.layer = newLayer;
+
         if (newLayer.fullExtent) {
           view.goTo(newLayer.fullExtent.expand(1.5));
         }
@@ -370,10 +460,6 @@
           switchFeed(this.getAttribute("data-feed"));
         });
       });
-
-    } catch (fatal) {
-      log("Fatal error: " + fatal.message, "err");
-      console.error(fatal);
     }
   </script>
 
