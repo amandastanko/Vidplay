@@ -3,11 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ArcGIS Video Layer Player</title>
+  <title>ArcGIS Video Player</title>
 
-  <!-- ArcGIS Maps SDK for JavaScript -->
   <link rel="stylesheet" href="https://js.arcgis.com/4.31/esri/themes/dark/main.css" />
-  <script src="https://js.arcgis.com/4.31/"></script>
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -16,47 +14,34 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #1a1a2e;
+      background: #0f0f1a;
       font-family: "Avenir Next", "Helvetica Neue", sans-serif;
     }
 
-    #app {
-      display: flex;
-      width: 100%;
-      height: 100%;
+    /* Hidden map — required by the API but not displayed */
+    #viewDiv {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      left: -9999px;
+      overflow: hidden;
     }
 
-    /* ── Map panel ── */
-    #viewDiv {
-      flex: 1;
+    /* ── Visible UI ── */
+    #app {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
       height: 100%;
       position: relative;
     }
 
-    /* ── Video panel ── */
-    #videoPanel {
-      width: 420px;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      background: #0f0f1a;
-      border-left: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
     /* ── Feed switcher ── */
     #feedSwitcher {
-      padding: 14px 18px;
+      padding: 12px 16px;
       background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
       border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    }
-
-    #feedSwitcher h2 {
-      font-size: 13px;
-      font-weight: 600;
-      color: rgba(255, 255, 255, 0.9);
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      margin-bottom: 10px;
+      flex-shrink: 0;
     }
 
     .feed-buttons {
@@ -76,7 +61,7 @@
       font-weight: 500;
       cursor: pointer;
       transition: all 0.25s ease;
-      text-align: left;
+      text-align: center;
       line-height: 1.4;
     }
 
@@ -95,7 +80,7 @@
       display: block;
       font-weight: 600;
       font-size: 12px;
-      margin-bottom: 2px;
+      margin-bottom: 1px;
     }
 
     .feed-btn .feed-desc {
@@ -104,20 +89,20 @@
       opacity: 0.6;
     }
 
-    /* ── Video player container ── */
+    /* ── Video player fills remaining space ── */
     #videoPlayerDiv {
       flex: 1;
       overflow: hidden;
     }
 
-    /* ── Loading overlay ── */
+    /* ── Loading state ── */
     #loadingOverlay {
       position: absolute;
       inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #1a1a2e;
+      background: #0f0f1a;
       z-index: 100;
       transition: opacity 0.6s ease;
     }
@@ -145,150 +130,112 @@
       color: rgba(255, 255, 255, 0.5);
       font-size: 13px;
     }
-
-    /* ── Responsive ── */
-    @media (max-width: 800px) {
-      #app { flex-direction: column; }
-      #videoPanel { width: 100%; height: 45%; }
-      #viewDiv { height: 55%; }
-    }
   </style>
 </head>
 <body>
 
+  <!-- Hidden map (required by VideoPlayer API) -->
+  <div id="viewDiv"></div>
+
   <div id="app">
-    <div id="viewDiv">
-      <div id="loadingOverlay">
-        <div class="loading-content">
-          <div class="loading-spinner"></div>
-          <p>Loading video layer&hellip;</p>
-        </div>
+    <div id="feedSwitcher">
+      <div class="feed-buttons">
+        <button class="feed-btn active" data-feed="collaboration">
+          <span class="feed-label">Collaboration</span>
+          <span class="feed-desc">Collaboration Table</span>
+        </button>
+        <button class="feed-btn" data-feed="drone">
+          <span class="feed-label">Drone</span>
+          <span class="feed-desc">Drone Table</span>
+        </button>
       </div>
     </div>
+    <div id="videoPlayerDiv"></div>
 
-    <div id="videoPanel">
-      <div id="feedSwitcher">
-        <h2>Video Feeds</h2>
-        <div class="feed-buttons">
-          <button class="feed-btn active" data-feed="collaboration">
-            <span class="feed-label">Collaboration</span>
-            <span class="feed-desc">Collaboration Table</span>
-          </button>
-          <button class="feed-btn" data-feed="drone">
-            <span class="feed-label">Drone</span>
-            <span class="feed-desc">Drone Table</span>
-          </button>
-        </div>
+    <div id="loadingOverlay">
+      <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <p>Loading video feed&hellip;</p>
       </div>
-      <div id="videoPlayerDiv"></div>
     </div>
   </div>
 
-  <script>
-    require([
-      "esri/Map",
-      "esri/views/MapView",
-      "esri/layers/VideoLayer",
-      "esri/widgets/VideoPlayer"
-    ], function (Map, MapView, VideoLayer, VideoPlayer) {
+  <script type="module">
+    import Map from "https://js.arcgis.com/4.31/@arcgis/core/Map.js";
+    import MapView from "https://js.arcgis.com/4.31/@arcgis/core/views/MapView.js";
+    import VideoLayer from "https://js.arcgis.com/4.31/@arcgis/core/layers/VideoLayer.js";
+    import VideoPlayer from "https://js.arcgis.com/4.31/@arcgis/core/widgets/VideoPlayer.js";
 
-      // ── Define the two video feeds ──
-      var feeds = {
-        collaboration: {
-          url: "https://geoxc-ecs-video.esri.com/server/rest/services/Collaboration_Table/VideoServer",
-          title: "Collaboration Table Video"
-        },
-        drone: {
-          url: "https://geoxc-ecs-video.esri.com/server/rest/services/Drone_Table/VideoServer",
-          title: "Drone Table Video"
-        }
-      };
+    // ── Two video feeds ──
+    const collaborationLayer = new VideoLayer({
+      url: "https://geoxc-ecs-video.esri.com/server/rest/services/Collaboration_Table/VideoServer",
+      title: "Collaboration Table Video",
+      autoplay: true
+    });
 
-      // ── Create both video layers up front ──
-      var collaborationLayer = new VideoLayer({
-        url: feeds.collaboration.url,
-        title: feeds.collaboration.title
-      });
+    const droneLayer = new VideoLayer({
+      url: "https://geoxc-ecs-video.esri.com/server/rest/services/Drone_Table/VideoServer",
+      title: "Drone Table Video",
+      autoplay: true
+    });
 
-      var droneLayer = new VideoLayer({
-        url: feeds.drone.url,
-        title: feeds.drone.title
-      });
+    // ── Hidden map & view (required by VideoPlayer) ──
+    const map = new Map({
+      basemap: "dark-gray-vector",
+      layers: [collaborationLayer]
+    });
 
-      // ── Map & View ──
-      var map = new Map({
-        basemap: "dark-gray-vector",
-        layers: [collaborationLayer]
-      });
+    const view = new MapView({
+      container: "viewDiv",
+      map: map,
+      zoom: 3,
+      center: [0, 0],
+      ui: { components: [] }
+    });
 
-      var view = new MapView({
-        container: "viewDiv",
-        map: map,
-        zoom: 4,
-        center: [-98.5, 39.8],
-        ui: { components: ["zoom", "compass", "attribution"] }
-      });
+    // ── Video Player ──
+    const videoPlayer = new VideoPlayer({
+      layer: collaborationLayer,
+      view: view,
+      container: "videoPlayerDiv"
+    });
 
-      // ── Video Player ──
-      var videoPlayer = new VideoPlayer({
-        layer: collaborationLayer,
-        view: view,
-        container: "videoPlayerDiv"
-      });
+    // ── Feed switching ──
+    let activeFeed = "collaboration";
 
-      // ── Track active feed ──
-      var activeFeed = "collaboration";
+    function getLayer(feedKey) {
+      return feedKey === "collaboration" ? collaborationLayer : droneLayer;
+    }
 
-      function getLayerForFeed(feedKey) {
-        return feedKey === "collaboration" ? collaborationLayer : droneLayer;
-      }
+    function switchFeed(feedKey) {
+      if (feedKey === activeFeed) return;
 
-      // ── Switch feeds ──
-      function switchFeed(feedKey) {
-        if (feedKey === activeFeed) return;
+      const oldLayer = getLayer(activeFeed);
+      const newLayer = getLayer(feedKey);
 
-        var oldLayer = getLayerForFeed(activeFeed);
-        var newLayer = getLayerForFeed(feedKey);
+      map.remove(oldLayer);
+      map.add(newLayer);
+      videoPlayer.layer = newLayer;
 
-        // Swap layer on the map
-        map.remove(oldLayer);
-        map.add(newLayer);
-
-        // Point the video player at the new layer
-        videoPlayer.layer = newLayer;
-
-        // Zoom to the new layer extent when ready
-        newLayer.when(function () {
-          if (newLayer.fullExtent) {
-            view.goTo(newLayer.fullExtent.expand(1.5));
-          }
-        });
-
-        // Update button states
-        activeFeed = feedKey;
-        document.querySelectorAll(".feed-btn").forEach(function (btn) {
-          btn.classList.toggle("active", btn.getAttribute("data-feed") === feedKey);
-        });
-      }
-
-      // ── Button click handlers ──
+      activeFeed = feedKey;
       document.querySelectorAll(".feed-btn").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          switchFeed(this.getAttribute("data-feed"));
-        });
+        btn.classList.toggle("active", btn.getAttribute("data-feed") === feedKey);
       });
+    }
 
-      // ── Initial load ──
-      collaborationLayer.when(function () {
-        if (collaborationLayer.fullExtent) {
-          view.goTo(collaborationLayer.fullExtent.expand(1.5));
-        }
-        document.getElementById("loadingOverlay").classList.add("hidden");
-      }).catch(function (error) {
-        console.error("Video layer failed to load:", error);
-        document.querySelector(".loading-content p").textContent =
-          "Unable to load video layer. Check the service URL.";
+    document.querySelectorAll(".feed-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        switchFeed(this.getAttribute("data-feed"));
       });
+    });
+
+    // ── Initial load ──
+    collaborationLayer.when(function () {
+      document.getElementById("loadingOverlay").classList.add("hidden");
+    }).catch(function (error) {
+      console.error("Video layer failed to load:", error);
+      document.querySelector(".loading-content p").textContent =
+        "Unable to load video feed. Check the service URL.";
     });
   </script>
 
