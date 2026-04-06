@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ArcGIS Video Player</title>
 
-  <link rel="stylesheet" href="https://js.arcgis.com/4.32/esri/themes/dark/main.css" />
+  <!-- HLS.js for playing HLS streams in the browser -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -16,16 +17,6 @@
       overflow: hidden;
       background: #0f0f1a;
       font-family: "Avenir Next", "Helvetica Neue", sans-serif;
-    }
-
-    #viewDiv {
-      position: absolute;
-      width: 400px;
-      height: 400px;
-      left: 0; top: 0;
-      visibility: hidden;
-      pointer-events: none;
-      z-index: -1;
     }
 
     #app {
@@ -81,7 +72,23 @@
       display: block; font-size: 10px; opacity: 0.6;
     }
 
-    #videoPlayerDiv { flex: 1; overflow: hidden; }
+    /* ── Video container ── */
+    #videoContainer {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      overflow: hidden;
+    }
+
+    #videoPlayer {
+      max-width: 100%;
+      max-height: 100%;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
 
     /* ── Auth screen ── */
     #authScreen {
@@ -128,9 +135,7 @@
       text-decoration: none;
     }
 
-    .auth-card a:hover {
-      text-decoration: underline;
-    }
+    .auth-card a:hover { text-decoration: underline; }
 
     .auth-card ol {
       color: rgba(255, 255, 255, 0.5);
@@ -162,13 +167,8 @@
       transition: border-color 0.2s;
     }
 
-    #tokenInput:focus {
-      border-color: rgba(79, 195, 247, 0.5);
-    }
-
-    #tokenInput::placeholder {
-      color: rgba(255, 255, 255, 0.2);
-    }
+    #tokenInput:focus { border-color: rgba(79, 195, 247, 0.5); }
+    #tokenInput::placeholder { color: rgba(255, 255, 255, 0.2); }
 
     #connectBtn {
       width: 100%;
@@ -184,14 +184,8 @@
       transition: all 0.2s;
     }
 
-    #connectBtn:hover {
-      background: rgba(79, 195, 247, 0.25);
-    }
-
-    #connectBtn:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
+    #connectBtn:hover { background: rgba(79, 195, 247, 0.25); }
+    #connectBtn:disabled { opacity: 0.4; cursor: not-allowed; }
 
     #authError {
       color: #ef5350;
@@ -200,45 +194,29 @@
       display: none;
     }
 
-    /* ── Loading overlay ── */
-    #loadingOverlay {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #0f0f1a;
-      z-index: 100;
-      transition: opacity 0.6s ease;
+    /* ── Debug log ── */
+    #debugLog {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      max-height: 180px;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.9);
+      padding: 10px 14px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 11px;
+      line-height: 1.6;
+      color: #aaa;
+      z-index: 9999;
+      border-top: 1px solid rgba(79, 195, 247, 0.3);
     }
 
-    #loadingOverlay.hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    .loading-content { text-align: center; }
-
-    .loading-spinner {
-      width: 36px; height: 36px;
-      border: 3px solid rgba(255, 255, 255, 0.1);
-      border-top-color: #4fc3f7;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 16px;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .loading-content p {
-      color: rgba(255, 255, 255, 0.5);
-      font-size: 13px;
-    }
+    #debugLog .log-ok { color: #66bb6a; }
+    #debugLog .log-warn { color: #ffa726; }
+    #debugLog .log-err { color: #ef5350; }
+    #debugLog .log-info { color: #4fc3f7; }
   </style>
 </head>
 <body>
-
-  <div id="viewDiv"></div>
 
   <div id="app">
     <div id="feedSwitcher">
@@ -253,7 +231,10 @@
         </button>
       </div>
     </div>
-    <div id="videoPlayerDiv"></div>
+
+    <div id="videoContainer">
+      <video id="videoPlayer" controls autoplay muted></video>
+    </div>
 
     <!-- Auth screen -->
     <div id="authScreen">
@@ -272,46 +253,56 @@
         <p id="authError"></p>
       </div>
     </div>
-
-    <!-- Loading overlay -->
-    <div id="loadingOverlay" class="hidden">
-      <div class="loading-content">
-        <div class="loading-spinner"></div>
-        <p id="statusMessage">Loading video feeds…</p>
-      </div>
-    </div>
   </div>
 
-  <script type="module">
-    const { default: esriConfig } = await import("https://js.arcgis.com/4.32/@arcgis/core/config.js");
-    const { default: IdentityManager } = await import("https://js.arcgis.com/4.32/@arcgis/core/identity/IdentityManager.js");
-    const { default: Credential } = await import("https://js.arcgis.com/4.32/@arcgis/core/identity/Credential.js");
-    const { default: Map } = await import("https://js.arcgis.com/4.32/@arcgis/core/Map.js");
-    const { default: MapView } = await import("https://js.arcgis.com/4.32/@arcgis/core/views/MapView.js");
-    const { default: VideoLayer } = await import("https://js.arcgis.com/4.32/@arcgis/core/layers/VideoLayer.js");
-    const { default: VideoPlayer } = await import("https://js.arcgis.com/4.32/@arcgis/core/widgets/VideoPlayer.js");
+  <div id="debugLog"></div>
 
-    const portalUrl = "https://geoxc-ecs.esri.com/portal";
-    const videoServerUrl = "https://geoxc-ecs-video.esri.com/server";
+  <script>
+    // ── Debug logger ──
+    const logEl = document.getElementById("debugLog");
+    function log(msg, type) {
+      type = type || "info";
+      const div = document.createElement("div");
+      div.className = "log-" + type;
+      div.textContent = "[" + new Date().toLocaleTimeString() + "] " + msg;
+      logEl.appendChild(div);
+      logEl.scrollTop = logEl.scrollHeight;
+      console.log("[VP]", msg);
+    }
 
-    esriConfig.portalUrl = portalUrl;
+    // ── Config ──
+    const VIDEO_SERVER = "https://geoxc-ecs-video.esri.com/server/rest/services";
 
-    // ── UI references ──
+    const feeds = {
+      collaboration: {
+        service: "Collaboration_Table/VideoServer",
+        label: "Collaboration Table"
+      },
+      drone: {
+        service: "Drone_Table/VideoServer",
+        label: "Drone Table"
+      }
+    };
+
+    let currentToken = null;
+    let currentHls = null;
+    let activeFeed = "collaboration";
+
+    // ── UI refs ──
     const authScreen = document.getElementById("authScreen");
-    const loadingOverlay = document.getElementById("loadingOverlay");
-    const statusMsg = document.getElementById("statusMessage");
     const tokenInput = document.getElementById("tokenInput");
     const connectBtn = document.getElementById("connectBtn");
     const authError = document.getElementById("authError");
+    const videoEl = document.getElementById("videoPlayer");
 
-    // ── Connect button handler ──
+    // ── Auth ──
     connectBtn.addEventListener("click", handleConnect);
-    tokenInput.addEventListener("keydown", (e) => {
+    tokenInput.addEventListener("keydown", function (e) {
       if (e.key === "Enter") handleConnect();
     });
 
     async function handleConnect() {
-      const token = tokenInput.value.trim();
+      var token = tokenInput.value.trim();
       if (!token) {
         showError("Please paste a token.");
         return;
@@ -321,41 +312,44 @@
       connectBtn.textContent = "Connecting…";
       authError.style.display = "none";
 
+      log("Testing token against Video Server…");
+
       try {
-        // Register the token for both the portal and the video server
-        const portalCredential = new Credential({
-          userId: "user",
-          server: portalUrl + "/sharing/rest",
-          token: token
-        });
+        // Test: fetch service metadata with the token
+        var metaUrl = VIDEO_SERVER + "/" + feeds.collaboration.service + "?f=json&token=" + token;
+        log("Fetching: " + metaUrl);
 
-        const videoCredential = new Credential({
-          userId: "user",
-          server: videoServerUrl + "/rest/services",
-          token: token
-        });
+        var resp = await fetch(metaUrl);
+        var data = await resp.json();
 
-        IdentityManager.registerToken(portalCredential.toJSON());
-        IdentityManager.registerToken(videoCredential.toJSON());
-
-        // Quick test: try to fetch the video service metadata
-        const testUrl = videoServerUrl + "/rest/services/Collaboration_Table/VideoServer?f=json&token=" + token;
-        const resp = await fetch(testUrl);
-        const data = await resp.json();
+        log("Response keys: " + Object.keys(data).join(", "), "info");
 
         if (data.error) {
-          throw new Error(data.error.message || "Token rejected by Video Server");
+          throw new Error(data.error.message || "Token rejected");
         }
 
-        console.log("Video service metadata:", data);
+        log("Service metadata received!", "ok");
+        log("  Service name: " + (data.serviceName || data.name || "unknown"), "ok");
 
-        // Token works — proceed to load the player
+        // Check if there's a connection URL or HLS info
+        if (data.connectionUrl) {
+          log("  Connection URL: " + data.connectionUrl, "ok");
+        }
+        if (data.streamUrls) {
+          log("  Stream URLs: " + JSON.stringify(data.streamUrls), "ok");
+        }
+
+        // Log full response for debugging
+        log("  Full metadata: " + JSON.stringify(data).substring(0, 500), "info");
+
+        currentToken = token;
+
+        // Hide auth, try to load the video
         authScreen.classList.add("hidden");
-        loadingOverlay.classList.remove("hidden");
-        await initPlayer();
+        await loadFeed("collaboration");
 
       } catch (err) {
-        console.error("Connection error:", err);
+        log("Connection failed: " + err.message, "err");
         showError("Failed: " + err.message);
         connectBtn.disabled = false;
         connectBtn.textContent = "Connect";
@@ -367,100 +361,181 @@
       authError.style.display = "block";
     }
 
-    // ── Initialize the video player ──
-    async function initPlayer() {
-      statusMsg.textContent = "Loading Collaboration video…";
+    // ── Load a video feed ──
+    async function loadFeed(feedKey) {
+      var feed = feeds[feedKey];
+      log("Loading feed: " + feed.label);
 
-      const collaborationLayer = new VideoLayer({
-        url: videoServerUrl + "/rest/services/Collaboration_Table/VideoServer",
-        title: "Collaboration Table Video",
-        autoplay: true
-      });
-
-      const droneLayer = new VideoLayer({
-        url: videoServerUrl + "/rest/services/Drone_Table/VideoServer",
-        title: "Drone Table Video",
-        autoplay: true
-      });
-
-      const map = new Map({
-        basemap: "dark-gray-vector",
-        layers: [collaborationLayer]
-      });
-
-      const view = new MapView({
-        container: "viewDiv",
-        map: map,
-        zoom: 3,
-        center: [0, 0],
-        ui: { components: [] }
-      });
-
-      await view.when();
+      // Step 1: Get service info to find the stream/playback URL
+      var serviceUrl = VIDEO_SERVER + "/" + feed.service;
+      var infoUrl = serviceUrl + "?f=json&token=" + currentToken;
 
       try {
-        await collaborationLayer.when();
-        console.log("Layer loaded. Duration:", collaborationLayer.duration);
+        var resp = await fetch(infoUrl);
+        var info = await resp.json();
 
-        if (collaborationLayer.fullExtent) {
-          await view.goTo(collaborationLayer.fullExtent.expand(1.5));
+        log("Service info loaded for " + feed.label, "ok");
+
+        // Step 2: Try to find the HLS/stream URL
+        // VideoServer typically exposes a /stream or provides an HLS m3u8 URL
+        var hlsUrl = null;
+
+        // Check if the service directly provides a connection/stream URL
+        if (info.connectionUrl) {
+          hlsUrl = info.connectionUrl;
+          log("Found connectionUrl: " + hlsUrl, "ok");
         }
-      } catch (e) {
-        console.error("Layer load error:", e);
-        statusMsg.textContent = "Video layer failed to load.";
-        return;
+
+        // Try the /stream endpoint
+        if (!hlsUrl) {
+          var streamUrl = serviceUrl + "/0/stream?f=json&token=" + currentToken;
+          log("Trying /0/stream endpoint…");
+          try {
+            var streamResp = await fetch(streamUrl);
+            var streamData = await streamResp.json();
+            log("Stream response: " + JSON.stringify(streamData).substring(0, 300), "info");
+
+            if (streamData.streamUrl) {
+              hlsUrl = streamData.streamUrl;
+            } else if (streamData.hlsUrl) {
+              hlsUrl = streamData.hlsUrl;
+            } else if (streamData.url) {
+              hlsUrl = streamData.url;
+            }
+          } catch (e) {
+            log("Stream endpoint error: " + e.message, "warn");
+          }
+        }
+
+        // Try the /0/play endpoint
+        if (!hlsUrl) {
+          var playUrl = serviceUrl + "/0/play?f=json&token=" + currentToken;
+          log("Trying /0/play endpoint…");
+          try {
+            var playResp = await fetch(playUrl);
+            var playData = await playResp.json();
+            log("Play response: " + JSON.stringify(playData).substring(0, 300), "info");
+
+            if (playData.streamUrl) {
+              hlsUrl = playData.streamUrl;
+            } else if (playData.hlsUrl) {
+              hlsUrl = playData.hlsUrl;
+            } else if (playData.url) {
+              hlsUrl = playData.url;
+            }
+          } catch (e) {
+            log("Play endpoint error: " + e.message, "warn");
+          }
+        }
+
+        // Try fetching the layer info at /0
+        if (!hlsUrl) {
+          var layerUrl = serviceUrl + "/0?f=json&token=" + currentToken;
+          log("Trying /0 layer endpoint…");
+          try {
+            var layerResp = await fetch(layerUrl);
+            var layerData = await layerResp.json();
+            log("Layer 0 response: " + JSON.stringify(layerData).substring(0, 500), "info");
+
+            // Look for any URL-like properties
+            for (var key in layerData) {
+              if (typeof layerData[key] === "string" && layerData[key].indexOf("http") === 0) {
+                log("  Found URL property '" + key + "': " + layerData[key], "info");
+              }
+            }
+
+            if (layerData.connectionUrl) hlsUrl = layerData.connectionUrl;
+            if (layerData.streamUrl) hlsUrl = layerData.streamUrl;
+            if (layerData.hlsUrl) hlsUrl = layerData.hlsUrl;
+          } catch (e) {
+            log("Layer 0 error: " + e.message, "warn");
+          }
+        }
+
+        if (!hlsUrl) {
+          log("Could not find HLS stream URL. Dumping service info for inspection:", "warn");
+          log(JSON.stringify(info, null, 2), "warn");
+          return;
+        }
+
+        // Append token if needed
+        if (hlsUrl.indexOf("token=") === -1) {
+          hlsUrl += (hlsUrl.indexOf("?") > -1 ? "&" : "?") + "token=" + currentToken;
+        }
+
+        log("Playing HLS stream: " + hlsUrl, "ok");
+        playHls(hlsUrl);
+
+      } catch (err) {
+        log("loadFeed error: " + err.message, "err");
+      }
+    }
+
+    // ── Play HLS stream ──
+    function playHls(url) {
+      // Destroy previous instance
+      if (currentHls) {
+        currentHls.destroy();
+        currentHls = null;
       }
 
-      statusMsg.textContent = "Starting player…";
+      if (Hls.isSupported()) {
+        var hls = new Hls({
+          debug: false,
+          enableWorker: true,
+          xhrSetup: function (xhr, url) {
+            // Append token to segment requests if needed
+            if (url.indexOf("token=") === -1 && currentToken) {
+              var sep = url.indexOf("?") > -1 ? "&" : "?";
+              xhr.open("GET", url + sep + "token=" + currentToken, true);
+            }
+          }
+        });
 
-      const videoPlayer = new VideoPlayer({
-        layer: collaborationLayer,
-        view: view,
-        container: "videoPlayerDiv"
-      });
+        hls.loadSource(url);
+        hls.attachMedia(videoEl);
 
-      loadingOverlay.classList.add("hidden");
+        hls.on(Hls.Events.MANIFEST_PARSED, function () {
+          log("HLS manifest parsed — playing!", "ok");
+          videoEl.play().catch(function (e) {
+            log("Autoplay blocked: " + e.message + " (click play manually)", "warn");
+          });
+        });
 
-      // ── Feed switching ──
-      let activeFeed = "collaboration";
+        hls.on(Hls.Events.ERROR, function (event, data) {
+          log("HLS error: " + data.type + " / " + data.details, "err");
+          if (data.fatal) {
+            log("Fatal HLS error. Type: " + data.type, "err");
+          }
+        });
 
-      function getLayer(key) {
-        return key === "collaboration" ? collaborationLayer : droneLayer;
+        currentHls = hls;
+
+      } else if (videoEl.canPlayType("application/vnd.apple.mpegurl")) {
+        // Native HLS (Safari)
+        videoEl.src = url;
+        videoEl.addEventListener("loadedmetadata", function () {
+          videoEl.play();
+        });
+      } else {
+        log("HLS not supported in this browser", "err");
       }
+    }
 
-      async function switchFeed(key) {
+    // ── Feed switching ──
+    document.querySelectorAll(".feed-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var key = this.getAttribute("data-feed");
         if (key === activeFeed) return;
 
-        const oldLayer = getLayer(activeFeed);
-        const newLayer = getLayer(key);
-
-        map.remove(oldLayer);
-        map.add(newLayer);
-
-        try {
-          await newLayer.when();
-        } catch (e) {
-          console.error("Layer switch error:", e);
-        }
-
-        videoPlayer.layer = newLayer;
-
-        if (newLayer.fullExtent) {
-          view.goTo(newLayer.fullExtent.expand(1.5));
-        }
-
         activeFeed = key;
-        document.querySelectorAll(".feed-btn").forEach(function (btn) {
-          btn.classList.toggle("active", btn.getAttribute("data-feed") === key);
+        document.querySelectorAll(".feed-btn").forEach(function (b) {
+          b.classList.toggle("active", b.getAttribute("data-feed") === key);
         });
-      }
 
-      document.querySelectorAll(".feed-btn").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          switchFeed(this.getAttribute("data-feed"));
-        });
+        loadFeed(key);
       });
-    }
+    });
   </script>
 
 </body>
