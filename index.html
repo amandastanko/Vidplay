@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ArcGIS Video Player</title>
 
-  <link rel="stylesheet" href="https://js.arcgis.com/4.31/esri/themes/dark/main.css" />
+  <link rel="stylesheet" href="https://js.arcgis.com/4.32/esri/themes/dark/main.css" />
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -18,16 +18,17 @@
       font-family: "Avenir Next", "Helvetica Neue", sans-serif;
     }
 
-    /* Hidden map — required by the API but not displayed */
+    /* Hidden map — real dimensions so MapView initializes fully */
     #viewDiv {
       position: absolute;
-      width: 1px;
-      height: 1px;
-      left: -9999px;
-      overflow: hidden;
+      width: 400px;
+      height: 400px;
+      left: 0; top: 0;
+      visibility: hidden;
+      pointer-events: none;
+      z-index: -1;
     }
 
-    /* ── Visible UI ── */
     #app {
       display: flex;
       flex-direction: column;
@@ -44,10 +45,7 @@
       flex-shrink: 0;
     }
 
-    .feed-buttons {
-      display: flex;
-      gap: 8px;
-    }
+    .feed-buttons { display: flex; gap: 8px; }
 
     .feed-btn {
       flex: 1;
@@ -77,26 +75,18 @@
     }
 
     .feed-btn .feed-label {
-      display: block;
-      font-weight: 600;
-      font-size: 12px;
-      margin-bottom: 1px;
+      display: block; font-weight: 600; font-size: 12px; margin-bottom: 1px;
     }
 
     .feed-btn .feed-desc {
-      display: block;
-      font-size: 10px;
-      opacity: 0.6;
+      display: block; font-size: 10px; opacity: 0.6;
     }
 
-    /* ── Video player fills remaining space ── */
-    #videoPlayerDiv {
-      flex: 1;
-      overflow: hidden;
-    }
+    /* ── Video player ── */
+    #videoPlayerDiv { flex: 1; overflow: hidden; }
 
-    /* ── Loading state ── */
-    #loadingOverlay {
+    /* ── Loading / status overlay ── */
+    #statusOverlay {
       position: absolute;
       inset: 0;
       display: flex;
@@ -107,16 +97,15 @@
       transition: opacity 0.6s ease;
     }
 
-    #loadingOverlay.hidden {
+    #statusOverlay.hidden {
       opacity: 0;
       pointer-events: none;
     }
 
-    .loading-content { text-align: center; }
+    .status-content { text-align: center; max-width: 360px; padding: 20px; }
 
     .loading-spinner {
-      width: 36px;
-      height: 36px;
+      width: 36px; height: 36px;
       border: 3px solid rgba(255, 255, 255, 0.1);
       border-top-color: #4fc3f7;
       border-radius: 50%;
@@ -126,15 +115,20 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .loading-content p {
+    .status-content p {
       color: rgba(255, 255, 255, 0.5);
       font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .status-content a {
+      color: #4fc3f7;
+      text-decoration: none;
     }
   </style>
 </head>
 <body>
 
-  <!-- Hidden map (required by VideoPlayer API) -->
   <div id="viewDiv"></div>
 
   <div id="app">
@@ -152,21 +146,54 @@
     </div>
     <div id="videoPlayerDiv"></div>
 
-    <div id="loadingOverlay">
-      <div class="loading-content">
+    <div id="statusOverlay">
+      <div class="status-content">
         <div class="loading-spinner"></div>
-        <p>Loading video feed&hellip;</p>
+        <p id="statusMessage">Signing in&hellip;</p>
       </div>
     </div>
   </div>
 
   <script type="module">
-    import Map from "https://js.arcgis.com/4.31/@arcgis/core/Map.js";
-    import MapView from "https://js.arcgis.com/4.31/@arcgis/core/views/MapView.js";
-    import VideoLayer from "https://js.arcgis.com/4.31/@arcgis/core/layers/VideoLayer.js";
-    import VideoPlayer from "https://js.arcgis.com/4.31/@arcgis/core/widgets/VideoPlayer.js";
+    import esriConfig from "https://js.arcgis.com/4.32/@arcgis/core/config.js";
+    import IdentityManager from "https://js.arcgis.com/4.32/@arcgis/core/identity/IdentityManager.js";
+    import ServerInfo from "https://js.arcgis.com/4.32/@arcgis/core/identity/ServerInfo.js";
+    import Map from "https://js.arcgis.com/4.32/@arcgis/core/Map.js";
+    import MapView from "https://js.arcgis.com/4.32/@arcgis/core/views/MapView.js";
+    import VideoLayer from "https://js.arcgis.com/4.32/@arcgis/core/layers/VideoLayer.js";
+    import VideoPlayer from "https://js.arcgis.com/4.32/@arcgis/core/widgets/VideoPlayer.js";
 
-    // ── Two video feeds ──
+    const statusMsg = document.getElementById("statusMessage");
+    const overlay = document.getElementById("statusOverlay");
+
+    // ──────────────────────────────────────────────
+    // Authentication
+    // The VideoServer sits on an ArcGIS Enterprise
+    // portal — register the server so the Identity
+    // Manager knows to prompt for credentials.
+    // ──────────────────────────────────────────────
+    const videoServerUrl = "https://geoxc-ecs-video.esri.com/server";
+
+    const serverInfo = new ServerInfo({
+      server: videoServerUrl,
+      hasServer: true
+    });
+
+    IdentityManager.registerServers([serverInfo]);
+
+    // This will trigger the sign-in popup for the Enterprise server.
+    // Once the user signs in, the token is cached for subsequent requests.
+    try {
+      statusMsg.textContent = "Signing in to Video Server…";
+      await IdentityManager.getCredential(videoServerUrl + "/rest/services");
+    } catch (err) {
+      console.warn("Authentication skipped or failed:", err);
+      // Continue anyway — the service may be public or token may already exist
+    }
+
+    // ── Video layers ──
+    statusMsg.textContent = "Loading video feeds…";
+
     const collaborationLayer = new VideoLayer({
       url: "https://geoxc-ecs-video.esri.com/server/rest/services/Collaboration_Table/VideoServer",
       title: "Collaboration Table Video",
@@ -179,7 +206,7 @@
       autoplay: true
     });
 
-    // ── Hidden map & view (required by VideoPlayer) ──
+    // ── Hidden map & view ──
     const map = new Map({
       basemap: "dark-gray-vector",
       layers: [collaborationLayer]
@@ -193,50 +220,65 @@
       ui: { components: [] }
     });
 
-    // ── Video Player ──
-    const videoPlayer = new VideoPlayer({
-      layer: collaborationLayer,
-      view: view,
-      container: "videoPlayerDiv"
-    });
+    // ── Wait for everything to be ready ──
+    try {
+      await view.when();
+      await collaborationLayer.when();
 
-    // ── Feed switching ──
-    let activeFeed = "collaboration";
+      if (collaborationLayer.fullExtent) {
+        await view.goTo(collaborationLayer.fullExtent.expand(1.5));
+      }
 
-    function getLayer(feedKey) {
-      return feedKey === "collaboration" ? collaborationLayer : droneLayer;
-    }
+      const videoPlayer = new VideoPlayer({
+        layer: collaborationLayer,
+        view: view,
+        container: "videoPlayerDiv"
+      });
 
-    function switchFeed(feedKey) {
-      if (feedKey === activeFeed) return;
+      overlay.classList.add("hidden");
 
-      const oldLayer = getLayer(activeFeed);
-      const newLayer = getLayer(feedKey);
+      // ── Feed switching ──
+      let activeFeed = "collaboration";
 
-      map.remove(oldLayer);
-      map.add(newLayer);
-      videoPlayer.layer = newLayer;
+      function getLayer(key) {
+        return key === "collaboration" ? collaborationLayer : droneLayer;
+      }
 
-      activeFeed = feedKey;
+      async function switchFeed(key) {
+        if (key === activeFeed) return;
+
+        const oldLayer = getLayer(activeFeed);
+        const newLayer = getLayer(key);
+
+        map.remove(oldLayer);
+        map.add(newLayer);
+
+        await newLayer.when();
+        videoPlayer.layer = newLayer;
+
+        if (newLayer.fullExtent) {
+          view.goTo(newLayer.fullExtent.expand(1.5));
+        }
+
+        activeFeed = key;
+        document.querySelectorAll(".feed-btn").forEach(function (btn) {
+          btn.classList.toggle("active", btn.getAttribute("data-feed") === key);
+        });
+      }
+
       document.querySelectorAll(".feed-btn").forEach(function (btn) {
-        btn.classList.toggle("active", btn.getAttribute("data-feed") === feedKey);
+        btn.addEventListener("click", function () {
+          switchFeed(this.getAttribute("data-feed"));
+        });
       });
+
+    } catch (error) {
+      console.error("Failed to initialize:", error);
+      document.querySelector(".loading-spinner").style.display = "none";
+      statusMsg.innerHTML =
+        "Unable to load video feed.<br>Check that you have access to the Video Server " +
+        "and try <a href=\"javascript:location.reload()\">reloading</a>.";
     }
-
-    document.querySelectorAll(".feed-btn").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        switchFeed(this.getAttribute("data-feed"));
-      });
-    });
-
-    // ── Initial load ──
-    collaborationLayer.when(function () {
-      document.getElementById("loadingOverlay").classList.add("hidden");
-    }).catch(function (error) {
-      console.error("Video layer failed to load:", error);
-      document.querySelector(".loading-content p").textContent =
-        "Unable to load video feed. Check the service URL.";
-    });
   </script>
 
 </body>
