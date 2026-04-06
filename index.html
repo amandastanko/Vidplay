@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ArcGIS Video Player</title>
 
-  <!-- HLS.js for playing HLS streams in the browser -->
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
   <style>
@@ -27,7 +26,6 @@
       position: relative;
     }
 
-    /* ── Feed switcher ── */
     #feedSwitcher {
       padding: 12px 16px;
       background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
@@ -72,7 +70,6 @@
       display: block; font-size: 10px; opacity: 0.6;
     }
 
-    /* ── Video container ── */
     #videoContainer {
       flex: 1;
       display: flex;
@@ -90,7 +87,7 @@
       object-fit: contain;
     }
 
-    /* ── Auth screen ── */
+    /* Auth screen */
     #authScreen {
       position: absolute;
       inset: 0;
@@ -130,11 +127,7 @@
       margin-bottom: 16px;
     }
 
-    .auth-card a {
-      color: #4fc3f7;
-      text-decoration: none;
-    }
-
+    .auth-card a { color: #4fc3f7; text-decoration: none; }
     .auth-card a:hover { text-decoration: underline; }
 
     .auth-card ol {
@@ -164,7 +157,6 @@
       font-size: 12px;
       outline: none;
       margin-bottom: 14px;
-      transition: border-color 0.2s;
     }
 
     #tokenInput:focus { border-color: rgba(79, 195, 247, 0.5); }
@@ -181,7 +173,6 @@
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
     }
 
     #connectBtn:hover { background: rgba(79, 195, 247, 0.25); }
@@ -194,11 +185,10 @@
       display: none;
     }
 
-    /* ── Debug log ── */
     #debugLog {
       position: fixed;
       bottom: 0; left: 0; right: 0;
-      max-height: 180px;
+      max-height: 200px;
       overflow-y: auto;
       background: rgba(0, 0, 0, 0.9);
       padding: 10px 14px;
@@ -233,10 +223,9 @@
     </div>
 
     <div id="videoContainer">
-      <video id="videoPlayer" controls autoplay muted></video>
+      <video id="videoPlayer" controls autoplay muted playsinline></video>
     </div>
 
-    <!-- Auth screen -->
     <div id="authScreen">
       <div class="auth-card">
         <h2>Connect to Video Server</h2>
@@ -258,11 +247,10 @@
   <div id="debugLog"></div>
 
   <script>
-    // ── Debug logger ──
-    const logEl = document.getElementById("debugLog");
+    var logEl = document.getElementById("debugLog");
     function log(msg, type) {
       type = type || "info";
-      const div = document.createElement("div");
+      var div = document.createElement("div");
       div.className = "log-" + type;
       div.textContent = "[" + new Date().toLocaleTimeString() + "] " + msg;
       logEl.appendChild(div);
@@ -270,32 +258,23 @@
       console.log("[VP]", msg);
     }
 
-    // ── Config ──
-    const VIDEO_SERVER = "https://geoxc-ecs-video.esri.com/server/rest/services";
+    var VIDEO_SERVER = "https://geoxc-ecs-video.esri.com/server/rest/services";
 
-    const feeds = {
-      collaboration: {
-        service: "Collaboration_Table/VideoServer",
-        label: "Collaboration Table"
-      },
-      drone: {
-        service: "Drone_Table/VideoServer",
-        label: "Drone Table"
-      }
+    var feeds = {
+      collaboration: { service: "Collaboration_Table/VideoServer", label: "Collaboration Table" },
+      drone: { service: "Drone_Table/VideoServer", label: "Drone Table" }
     };
 
-    let currentToken = null;
-    let currentHls = null;
-    let activeFeed = "collaboration";
+    var currentToken = null;
+    var currentHls = null;
+    var activeFeed = "collaboration";
 
-    // ── UI refs ──
-    const authScreen = document.getElementById("authScreen");
-    const tokenInput = document.getElementById("tokenInput");
-    const connectBtn = document.getElementById("connectBtn");
-    const authError = document.getElementById("authError");
-    const videoEl = document.getElementById("videoPlayer");
+    var authScreen = document.getElementById("authScreen");
+    var tokenInput = document.getElementById("tokenInput");
+    var connectBtn = document.getElementById("connectBtn");
+    var authError = document.getElementById("authError");
+    var videoEl = document.getElementById("videoPlayer");
 
-    // ── Auth ──
     connectBtn.addEventListener("click", handleConnect);
     tokenInput.addEventListener("keydown", function (e) {
       if (e.key === "Enter") handleConnect();
@@ -303,53 +282,28 @@
 
     async function handleConnect() {
       var token = tokenInput.value.trim();
-      if (!token) {
-        showError("Please paste a token.");
-        return;
-      }
+      if (!token) { showError("Please paste a token."); return; }
 
       connectBtn.disabled = true;
       connectBtn.textContent = "Connecting…";
       authError.style.display = "none";
 
-      log("Testing token against Video Server…");
+      log("Testing token…");
 
       try {
-        // Test: fetch service metadata with the token
         var metaUrl = VIDEO_SERVER + "/" + feeds.collaboration.service + "?f=json&token=" + token;
-        log("Fetching: " + metaUrl);
-
         var resp = await fetch(metaUrl);
         var data = await resp.json();
 
-        log("Response keys: " + Object.keys(data).join(", "), "info");
+        if (data.error) throw new Error(data.error.message || "Token rejected");
 
-        if (data.error) {
-          throw new Error(data.error.message || "Token rejected");
-        }
-
-        log("Service metadata received!", "ok");
-        log("  Service name: " + (data.serviceName || data.name || "unknown"), "ok");
-
-        // Check if there's a connection URL or HLS info
-        if (data.connectionUrl) {
-          log("  Connection URL: " + data.connectionUrl, "ok");
-        }
-        if (data.streamUrls) {
-          log("  Stream URLs: " + JSON.stringify(data.streamUrls), "ok");
-        }
-
-        // Log full response for debugging
-        log("  Full metadata: " + JSON.stringify(data).substring(0, 500), "info");
-
+        log("Token valid! Service: " + data.serviceName, "ok");
         currentToken = token;
-
-        // Hide auth, try to load the video
         authScreen.classList.add("hidden");
         await loadFeed("collaboration");
 
       } catch (err) {
-        log("Connection failed: " + err.message, "err");
+        log("Failed: " + err.message, "err");
         showError("Failed: " + err.message);
         connectBtn.disabled = false;
         connectBtn.textContent = "Connect";
@@ -361,119 +315,134 @@
       authError.style.display = "block";
     }
 
-    // ── Load a video feed ──
     async function loadFeed(feedKey) {
       var feed = feeds[feedKey];
+      var baseUrl = VIDEO_SERVER + "/" + feed.service;
       log("Loading feed: " + feed.label);
 
-      // Step 1: Get service info to find the stream/playback URL
-      var serviceUrl = VIDEO_SERVER + "/" + feed.service;
-      var infoUrl = serviceUrl + "?f=json&token=" + currentToken;
-
       try {
-        var resp = await fetch(infoUrl);
-        var info = await resp.json();
+        // Get layer 0 info
+        var layerUrl = baseUrl + "/0?f=json&token=" + currentToken;
+        log("Fetching layer info: /0");
+        var layerResp = await fetch(layerUrl);
+        var layerData = await layerResp.json();
 
-        log("Service info loaded for " + feed.label, "ok");
+        log("Layer type: " + layerData.serviceType, "info");
+        log("Codecs: " + JSON.stringify(layerData.codecs), "info");
+        log("Container: " + (layerData.playbackInfo ? layerData.playbackInfo.containerFormat : "unknown"), "info");
 
-        // Step 2: Try to find the HLS/stream URL
-        // VideoServer typically exposes a /stream or provides an HLS m3u8 URL
+        if (layerData.livestreamInfo) {
+          log("Livestream active: " + layerData.livestreamInfo.active, "info");
+          log("Buffer size: " + layerData.livestreamInfo.bufferSize, "info");
+          if (layerData.livestreamInfo.sourceUrl) {
+            log("Source URL: " + layerData.livestreamInfo.sourceUrl, "info");
+          }
+        }
+
+        // Log ALL string properties to find URLs
+        log("Scanning all properties for URLs…", "info");
+        scanForUrls(layerData, "layerData");
+
+        // ── Try multiple known HLS URL patterns for ArcGIS Video Server ──
         var hlsUrl = null;
+        var candidates = [
+          baseUrl + "/0/stream.m3u8?token=" + currentToken,
+          baseUrl + "/0/hls/master.m3u8?token=" + currentToken,
+          baseUrl + "/0/hls/stream.m3u8?token=" + currentToken,
+          baseUrl + "/0/media/stream.m3u8?token=" + currentToken,
+          baseUrl + "/0/player?token=" + currentToken,
+          baseUrl + "/0/content/stream.m3u8?token=" + currentToken,
+        ];
 
-        // Check if the service directly provides a connection/stream URL
-        if (info.connectionUrl) {
-          hlsUrl = info.connectionUrl;
-          log("Found connectionUrl: " + hlsUrl, "ok");
+        // Also try the connection endpoint that returns JSON with HLS info
+        log("Trying /0/connection endpoint…", "info");
+        try {
+          var connResp = await fetch(baseUrl + "/0/connection?f=json&token=" + currentToken);
+          var connText = await connResp.text();
+          log("Connection response (" + connResp.status + "): " + connText.substring(0, 300), "info");
+          try {
+            var connData = JSON.parse(connText);
+            if (connData.hlsUrl) candidates.unshift(connData.hlsUrl);
+            if (connData.url) candidates.unshift(connData.url);
+            if (connData.streamUrl) candidates.unshift(connData.streamUrl);
+            scanForUrls(connData, "connData");
+          } catch(e) {}
+        } catch (e) {
+          log("Connection endpoint: " + e.message, "warn");
         }
 
-        // Try the /stream endpoint
-        if (!hlsUrl) {
-          var streamUrl = serviceUrl + "/0/stream?f=json&token=" + currentToken;
-          log("Trying /0/stream endpoint…");
+        // Try /0/hlsStream
+        log("Trying /0/hlsStream endpoint…", "info");
+        try {
+          var hlsResp = await fetch(baseUrl + "/0/hlsStream?f=json&token=" + currentToken);
+          var hlsText = await hlsResp.text();
+          log("hlsStream response (" + hlsResp.status + "): " + hlsText.substring(0, 300), "info");
           try {
-            var streamResp = await fetch(streamUrl);
-            var streamData = await streamResp.json();
-            log("Stream response: " + JSON.stringify(streamData).substring(0, 300), "info");
-
-            if (streamData.streamUrl) {
-              hlsUrl = streamData.streamUrl;
-            } else if (streamData.hlsUrl) {
-              hlsUrl = streamData.hlsUrl;
-            } else if (streamData.url) {
-              hlsUrl = streamData.url;
-            }
-          } catch (e) {
-            log("Stream endpoint error: " + e.message, "warn");
-          }
+            var hlsData = JSON.parse(hlsText);
+            if (hlsData.url) candidates.unshift(hlsData.url);
+            if (hlsData.hlsUrl) candidates.unshift(hlsData.hlsUrl);
+            scanForUrls(hlsData, "hlsData");
+          } catch(e) {}
+        } catch (e) {
+          log("hlsStream endpoint: " + e.message, "warn");
         }
 
-        // Try the /0/play endpoint
-        if (!hlsUrl) {
-          var playUrl = serviceUrl + "/0/play?f=json&token=" + currentToken;
-          log("Trying /0/play endpoint…");
+        // Probe each candidate URL with a HEAD request
+        log("Probing " + candidates.length + " candidate HLS URLs…", "info");
+        for (var i = 0; i < candidates.length; i++) {
+          var url = candidates[i];
+          // Ensure token is a string
+          if (typeof url !== "string") continue;
+
           try {
-            var playResp = await fetch(playUrl);
-            var playData = await playResp.json();
-            log("Play response: " + JSON.stringify(playData).substring(0, 300), "info");
+            log("  Probing: " + url.split("?")[0], "info");
+            var probeResp = await fetch(url, { method: "HEAD" });
+            log("    Status: " + probeResp.status + " | Content-Type: " + (probeResp.headers.get("content-type") || "none"), "info");
 
-            if (playData.streamUrl) {
-              hlsUrl = playData.streamUrl;
-            } else if (playData.hlsUrl) {
-              hlsUrl = playData.hlsUrl;
-            } else if (playData.url) {
-              hlsUrl = playData.url;
-            }
-          } catch (e) {
-            log("Play endpoint error: " + e.message, "warn");
-          }
-        }
-
-        // Try fetching the layer info at /0
-        if (!hlsUrl) {
-          var layerUrl = serviceUrl + "/0?f=json&token=" + currentToken;
-          log("Trying /0 layer endpoint…");
-          try {
-            var layerResp = await fetch(layerUrl);
-            var layerData = await layerResp.json();
-            log("Layer 0 response: " + JSON.stringify(layerData).substring(0, 500), "info");
-
-            // Look for any URL-like properties
-            for (var key in layerData) {
-              if (typeof layerData[key] === "string" && layerData[key].indexOf("http") === 0) {
-                log("  Found URL property '" + key + "': " + layerData[key], "info");
+            if (probeResp.ok || probeResp.status === 200) {
+              var ct = probeResp.headers.get("content-type") || "";
+              if (ct.indexOf("mpegurl") > -1 || ct.indexOf("mp2t") > -1 || ct.indexOf("octet-stream") > -1 || ct.indexOf("video") > -1 || url.indexOf(".m3u8") > -1) {
+                hlsUrl = url;
+                log("  Found working HLS URL!", "ok");
+                break;
+              }
+              // Even if content-type doesn't match, try it if status is 200
+              if (!hlsUrl) {
+                hlsUrl = url;
+                log("  200 OK — will try this URL", "ok");
               }
             }
-
-            if (layerData.connectionUrl) hlsUrl = layerData.connectionUrl;
-            if (layerData.streamUrl) hlsUrl = layerData.streamUrl;
-            if (layerData.hlsUrl) hlsUrl = layerData.hlsUrl;
           } catch (e) {
-            log("Layer 0 error: " + e.message, "warn");
+            log("    Probe error: " + e.message, "warn");
           }
         }
 
-        if (!hlsUrl) {
-          log("Could not find HLS stream URL. Dumping service info for inspection:", "warn");
-          log(JSON.stringify(info, null, 2), "warn");
-          return;
+        if (hlsUrl) {
+          log("Playing: " + hlsUrl, "ok");
+          playHls(hlsUrl);
+        } else {
+          log("No working HLS URL found. All candidates returned errors.", "err");
+          log("The livestream may need to be accessed via the JS SDK VideoLayer.", "warn");
         }
-
-        // Append token if needed
-        if (hlsUrl.indexOf("token=") === -1) {
-          hlsUrl += (hlsUrl.indexOf("?") > -1 ? "&" : "?") + "token=" + currentToken;
-        }
-
-        log("Playing HLS stream: " + hlsUrl, "ok");
-        playHls(hlsUrl);
 
       } catch (err) {
         log("loadFeed error: " + err.message, "err");
       }
     }
 
-    // ── Play HLS stream ──
+    function scanForUrls(obj, prefix) {
+      if (!obj || typeof obj !== "object") return;
+      for (var key in obj) {
+        var val = obj[key];
+        if (typeof val === "string" && (val.indexOf("http") === 0 || val.indexOf("/") === 0)) {
+          log("  " + prefix + "." + key + " = " + val, "info");
+        } else if (typeof val === "object" && val !== null) {
+          scanForUrls(val, prefix + "." + key);
+        }
+      }
+    }
+
     function playHls(url) {
-      // Destroy previous instance
       if (currentHls) {
         currentHls.destroy();
         currentHls = null;
@@ -483,11 +452,10 @@
         var hls = new Hls({
           debug: false,
           enableWorker: true,
-          xhrSetup: function (xhr, url) {
-            // Append token to segment requests if needed
-            if (url.indexOf("token=") === -1 && currentToken) {
-              var sep = url.indexOf("?") > -1 ? "&" : "?";
-              xhr.open("GET", url + sep + "token=" + currentToken, true);
+          xhrSetup: function (xhr, reqUrl) {
+            if (reqUrl.indexOf("token=") === -1 && currentToken) {
+              var sep = reqUrl.indexOf("?") > -1 ? "&" : "?";
+              xhr.open("GET", reqUrl + sep + "token=" + currentToken, true);
             }
           }
         });
@@ -498,41 +466,33 @@
         hls.on(Hls.Events.MANIFEST_PARSED, function () {
           log("HLS manifest parsed — playing!", "ok");
           videoEl.play().catch(function (e) {
-            log("Autoplay blocked: " + e.message + " (click play manually)", "warn");
+            log("Autoplay blocked: " + e.message, "warn");
           });
         });
 
         hls.on(Hls.Events.ERROR, function (event, data) {
           log("HLS error: " + data.type + " / " + data.details, "err");
-          if (data.fatal) {
-            log("Fatal HLS error. Type: " + data.type, "err");
-          }
         });
 
         currentHls = hls;
 
       } else if (videoEl.canPlayType("application/vnd.apple.mpegurl")) {
-        // Native HLS (Safari)
         videoEl.src = url;
-        videoEl.addEventListener("loadedmetadata", function () {
-          videoEl.play();
-        });
+        videoEl.addEventListener("loadedmetadata", function () { videoEl.play(); });
       } else {
         log("HLS not supported in this browser", "err");
       }
     }
 
-    // ── Feed switching ──
+    // Feed switching
     document.querySelectorAll(".feed-btn").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var key = this.getAttribute("data-feed");
         if (key === activeFeed) return;
-
         activeFeed = key;
         document.querySelectorAll(".feed-btn").forEach(function (b) {
           b.classList.toggle("active", b.getAttribute("data-feed") === key);
         });
-
         loadFeed(key);
       });
     });
