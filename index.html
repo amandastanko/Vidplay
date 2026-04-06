@@ -170,7 +170,6 @@
   <div id="debugLog"></div>
 
   <script type="module">
-    // ── Debug logger ──
     const logEl = document.getElementById("debugLog");
     function log(msg, type = "info") {
       const span = document.createElement("div");
@@ -186,9 +185,10 @@
 
     log("Starting imports…");
 
-    import("https://js.arcgis.com/4.32/@arcgis/core/config.js").then(m => m.default).then(async (esriConfig) => {
-
+    try {
+      const { default: esriConfig } = await import("https://js.arcgis.com/4.32/@arcgis/core/config.js");
       const { default: IdentityManager } = await import("https://js.arcgis.com/4.32/@arcgis/core/identity/IdentityManager.js");
+      const { default: OAuthInfo } = await import("https://js.arcgis.com/4.32/@arcgis/core/identity/OAuthInfo.js");
       const { default: ServerInfo } = await import("https://js.arcgis.com/4.32/@arcgis/core/identity/ServerInfo.js");
       const { default: Map } = await import("https://js.arcgis.com/4.32/@arcgis/core/Map.js");
       const { default: MapView } = await import("https://js.arcgis.com/4.32/@arcgis/core/views/MapView.js");
@@ -197,42 +197,68 @@
 
       log("All modules imported", "ok");
 
-      // ── Auth ──
+      // ──────────────────────────────────────────
+      // Authentication
+      // Portal: https://geoxc-ecs.esri.com/portal
+      // Video Server: https://geoxc-ecs-video.esri.com/server
+      // ──────────────────────────────────────────
+
+      const portalUrl = "https://geoxc-ecs.esri.com/portal";
       const videoServerUrl = "https://geoxc-ecs-video.esri.com/server";
 
+      // Point the SDK at the Enterprise portal
+      esriConfig.portalUrl = portalUrl;
+
+      // Register the video server as federated with the portal
       const serverInfo = new ServerInfo({
         server: videoServerUrl,
+        tokenServiceUrl: portalUrl + "/sharing/rest/generateToken",
         hasServer: true
       });
       IdentityManager.registerServers([serverInfo]);
 
-      log("Requesting credentials for Video Server…", "info");
-      statusMsg.textContent = "Signing in…";
+      log("Portal URL set: " + portalUrl, "info");
+      log("Video server registered with portal token service", "info");
+
+      // Request credentials against the portal
+      log("Requesting portal credentials…", "info");
+      statusMsg.textContent = "Signing in to portal…";
 
       try {
-        const credential = await IdentityManager.getCredential(videoServerUrl + "/rest/services");
-        log("Authenticated! Token: " + credential.token.substring(0, 20) + "…", "ok");
+        const credential = await IdentityManager.getCredential(portalUrl + "/sharing");
+        log("Portal auth success! User: " + (credential.userId || "unknown"), "ok");
+        log("Token preview: " + credential.token.substring(0, 25) + "…", "ok");
+
+        // Now get a credential for the video server using the portal token
+        log("Requesting video server credential…", "info");
+        try {
+          const videoCredential = await IdentityManager.getCredential(videoServerUrl + "/rest/services");
+          log("Video server auth success! Token: " + videoCredential.token.substring(0, 25) + "…", "ok");
+        } catch (ve) {
+          log("Video server credential: " + ve.message + " (may use portal token)", "warn");
+        }
       } catch (err) {
-        log("Auth failed or dismissed: " + err.message, "warn");
+        log("Portal auth failed: " + err.message, "err");
+        log("Attempting to continue without auth…", "warn");
       }
 
       // ── Create layers ──
-      log("Creating VideoLayer (Collaboration)…", "info");
+      log("Creating VideoLayers…", "info");
       statusMsg.textContent = "Loading video feeds…";
 
       const collaborationLayer = new VideoLayer({
-        url: "https://geoxc-ecs-video.esri.com/server/rest/services/Collaboration_Table/VideoServer",
+        url: videoServerUrl + "/rest/services/Collaboration_Table/VideoServer",
         title: "Collaboration Table Video",
         autoplay: true
       });
 
       const droneLayer = new VideoLayer({
-        url: "https://geoxc-ecs-video.esri.com/server/rest/services/Drone_Table/VideoServer",
+        url: videoServerUrl + "/rest/services/Drone_Table/VideoServer",
         title: "Drone Table Video",
         autoplay: true
       });
 
-      log("VideoLayers created. Loading map…", "info");
+      log("VideoLayers created", "ok");
 
       // ── Map & View ──
       const map = new Map({
@@ -248,18 +274,17 @@
         ui: { components: [] }
       });
 
-      // ── Step-by-step init with timeouts ──
       log("Waiting for MapView…", "info");
       statusMsg.textContent = "Initializing map view…";
 
       try {
         await Promise.race([
           view.when(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error("MapView timed out after 15s")), 15000))
+          new Promise((_, rej) => setTimeout(() => rej(new Error("MapView timed out (15s)")), 15000))
         ]);
         log("MapView ready. Size: " + view.width + "x" + view.height, "ok");
       } catch (e) {
-        log("MapView error: " + e.message, "err");
+        log("MapView: " + e.message, "err");
       }
 
       log("Waiting for Collaboration VideoLayer…", "info");
@@ -268,102 +293,88 @@
       try {
         await Promise.race([
           collaborationLayer.when(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error("VideoLayer timed out after 20s")), 20000))
+          new Promise((_, rej) => setTimeout(() => rej(new Error("VideoLayer timed out (30s)")), 30000))
         ]);
         log("Collaboration layer loaded!", "ok");
         log("  Type: " + collaborationLayer.type, "info");
-        log("  Duration: " + collaborationLayer.duration, "info");
+        log("  Duration: " + collaborationLayer.duration + "s", "info");
         log("  Extent: " + JSON.stringify(collaborationLayer.fullExtent?.toJSON()), "info");
         log("  Load status: " + collaborationLayer.loadStatus, "info");
       } catch (e) {
-        log("Collaboration layer error: " + e.message, "err");
-
-        // Try to get more detail
+        log("Collaboration layer: " + e.message, "err");
         if (collaborationLayer.loadError) {
-          log("  Load error detail: " + JSON.stringify(collaborationLayer.loadError), "err");
+          log("  Detail: " + JSON.stringify(collaborationLayer.loadError.message), "err");
         }
         log("  Load status: " + collaborationLayer.loadStatus, "warn");
       }
 
-      // ── Zoom to extent ──
       if (collaborationLayer.fullExtent) {
-        log("Zooming to layer extent…", "info");
+        log("Zooming to extent…", "info");
         try {
           await view.goTo(collaborationLayer.fullExtent.expand(1.5));
           log("View extent updated", "ok");
         } catch (e) {
-          log("goTo error: " + e.message, "warn");
+          log("goTo: " + e.message, "warn");
         }
-      } else {
-        log("No fullExtent on layer — skipping goTo", "warn");
       }
 
-      // ── Create VideoPlayer ──
       log("Creating VideoPlayer widget…", "info");
       statusMsg.textContent = "Starting video player…";
 
-      try {
-        const videoPlayer = new VideoPlayer({
-          layer: collaborationLayer,
-          view: view,
-          container: "videoPlayerDiv"
-        });
+      const videoPlayer = new VideoPlayer({
+        layer: collaborationLayer,
+        view: view,
+        container: "videoPlayerDiv"
+      });
 
-        log("VideoPlayer created!", "ok");
-        overlay.classList.add("hidden");
+      log("VideoPlayer created!", "ok");
+      overlay.classList.add("hidden");
 
-        // ── Feed switching ──
-        let activeFeed = "collaboration";
+      // ── Feed switching ──
+      let activeFeed = "collaboration";
 
-        function getLayer(key) {
-          return key === "collaboration" ? collaborationLayer : droneLayer;
-        }
-
-        async function switchFeed(key) {
-          if (key === activeFeed) return;
-          log("Switching to: " + key, "info");
-
-          const oldLayer = getLayer(activeFeed);
-          const newLayer = getLayer(key);
-
-          map.remove(oldLayer);
-          map.add(newLayer);
-
-          try {
-            await newLayer.when();
-            log(key + " layer loaded", "ok");
-          } catch (e) {
-            log(key + " layer failed: " + e.message, "err");
-          }
-
-          videoPlayer.layer = newLayer;
-
-          if (newLayer.fullExtent) {
-            view.goTo(newLayer.fullExtent.expand(1.5));
-          }
-
-          activeFeed = key;
-          document.querySelectorAll(".feed-btn").forEach(function (btn) {
-            btn.classList.toggle("active", btn.getAttribute("data-feed") === key);
-          });
-        }
-
-        document.querySelectorAll(".feed-btn").forEach(function (btn) {
-          btn.addEventListener("click", function () {
-            switchFeed(this.getAttribute("data-feed"));
-          });
-        });
-
-      } catch (e) {
-        log("VideoPlayer creation failed: " + e.message, "err");
-        document.querySelector(".loading-spinner").style.display = "none";
-        statusMsg.textContent = "Video player failed to initialize.";
+      function getLayer(key) {
+        return key === "collaboration" ? collaborationLayer : droneLayer;
       }
 
-    }).catch(err => {
-      log("Fatal import error: " + err.message, "err");
-      console.error(err);
-    });
+      async function switchFeed(key) {
+        if (key === activeFeed) return;
+        log("Switching to: " + key, "info");
+
+        const oldLayer = getLayer(activeFeed);
+        const newLayer = getLayer(key);
+
+        map.remove(oldLayer);
+        map.add(newLayer);
+
+        try {
+          await newLayer.when();
+          log(key + " layer loaded", "ok");
+        } catch (e) {
+          log(key + " layer failed: " + e.message, "err");
+        }
+
+        videoPlayer.layer = newLayer;
+        if (newLayer.fullExtent) {
+          view.goTo(newLayer.fullExtent.expand(1.5));
+        }
+
+        activeFeed = key;
+        document.querySelectorAll(".feed-btn").forEach(function (btn) {
+          btn.classList.toggle("active", btn.getAttribute("data-feed") === key);
+        });
+      }
+
+      document.querySelectorAll(".feed-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          switchFeed(this.getAttribute("data-feed"));
+        });
+      });
+
+    } catch (fatal) {
+      log("Fatal error: " + fatal.message, "err");
+      console.error(fatal);
+    }
   </script>
 
 </body>
