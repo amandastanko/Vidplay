@@ -14,7 +14,7 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #0f0f1a;
+      background: #0a0a14;
       font-family: "Avenir Next", "Helvetica Neue", sans-serif;
     }
 
@@ -26,9 +26,10 @@
       position: relative;
     }
 
+    /* ── Feed switcher ── */
     #feedSwitcher {
-      padding: 12px 16px;
-      background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
+      padding: 10px 14px;
+      background: #0f0f1a;
       border-bottom: 1px solid rgba(255, 255, 255, 0.06);
       flex-shrink: 0;
     }
@@ -37,11 +38,11 @@
 
     .feed-btn {
       flex: 1;
-      padding: 9px 12px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 8px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.10);
       border-radius: 6px;
-      background: rgba(255, 255, 255, 0.04);
-      color: rgba(255, 255, 255, 0.55);
+      background: rgba(255, 255, 255, 0.03);
+      color: rgba(255, 255, 255, 0.45);
       font-family: inherit;
       font-size: 12px;
       font-weight: 500;
@@ -52,13 +53,13 @@
     }
 
     .feed-btn:hover {
-      background: rgba(255, 255, 255, 0.08);
-      color: rgba(255, 255, 255, 0.8);
+      background: rgba(255, 255, 255, 0.07);
+      color: rgba(255, 255, 255, 0.75);
     }
 
     .feed-btn.active {
-      background: rgba(79, 195, 247, 0.12);
-      border-color: rgba(79, 195, 247, 0.5);
+      background: rgba(79, 195, 247, 0.10);
+      border-color: rgba(79, 195, 247, 0.45);
       color: #4fc3f7;
     }
 
@@ -67,9 +68,10 @@
     }
 
     .feed-btn .feed-desc {
-      display: block; font-size: 10px; opacity: 0.6;
+      display: block; font-size: 10px; opacity: 0.55;
     }
 
+    /* ── Video container ── */
     #videoContainer {
       flex: 1;
       display: flex;
@@ -77,6 +79,7 @@
       justify-content: center;
       background: #000;
       overflow: hidden;
+      position: relative;
     }
 
     #videoPlayer {
@@ -87,14 +90,48 @@
       object-fit: contain;
     }
 
-    /* Auth screen */
+    /* ── Live badge ── */
+    #liveBadge {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #ef5350;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    #liveBadge.visible { display: flex; }
+
+    #liveBadge .live-dot {
+      width: 7px;
+      height: 7px;
+      background: #ef5350;
+      border-radius: 50%;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ── Auth screen ── */
     #authScreen {
       position: absolute;
       inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #0f0f1a;
+      background: #0a0a14;
       z-index: 200;
       transition: opacity 0.5s ease;
     }
@@ -105,105 +142,121 @@
     }
 
     .auth-card {
-      background: #1a1a2e;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      padding: 32px;
-      max-width: 480px;
+      background: #13132a;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 14px;
+      padding: 36px;
+      max-width: 460px;
       width: 90%;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
     }
 
     .auth-card h2 {
       color: rgba(255, 255, 255, 0.9);
       font-size: 18px;
       font-weight: 600;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
+    }
+
+    .auth-card .subtitle {
+      color: rgba(255, 255, 255, 0.3);
+      font-size: 12px;
+      margin-bottom: 22px;
     }
 
     .auth-card p {
       color: rgba(255, 255, 255, 0.45);
       font-size: 13px;
       line-height: 1.6;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
 
     .auth-card a { color: #4fc3f7; text-decoration: none; }
     .auth-card a:hover { text-decoration: underline; }
 
     .auth-card ol {
-      color: rgba(255, 255, 255, 0.5);
+      color: rgba(255, 255, 255, 0.45);
       font-size: 12px;
-      line-height: 1.8;
-      margin: 0 0 20px 20px;
+      line-height: 2;
+      margin: 0 0 22px 20px;
     }
 
     .auth-card ol code {
       background: rgba(255, 255, 255, 0.06);
-      padding: 2px 6px;
+      padding: 2px 7px;
       border-radius: 3px;
       font-family: "SF Mono", "Fira Code", monospace;
-      font-size: 11px;
-      color: rgba(255, 255, 255, 0.7);
+      font-size: 10.5px;
+      color: rgba(255, 255, 255, 0.65);
     }
 
     #tokenInput {
       width: 100%;
-      padding: 10px 14px;
-      background: rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 11px 14px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.10);
       border-radius: 8px;
       color: rgba(255, 255, 255, 0.8);
       font-family: "SF Mono", "Fira Code", monospace;
       font-size: 12px;
       outline: none;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
+      transition: border-color 0.2s;
     }
 
     #tokenInput:focus { border-color: rgba(79, 195, 247, 0.5); }
-    #tokenInput::placeholder { color: rgba(255, 255, 255, 0.2); }
+    #tokenInput::placeholder { color: rgba(255, 255, 255, 0.15); }
 
     #connectBtn {
       width: 100%;
       padding: 11px;
-      background: rgba(79, 195, 247, 0.15);
-      border: 1px solid rgba(79, 195, 247, 0.4);
+      background: rgba(79, 195, 247, 0.12);
+      border: 1px solid rgba(79, 195, 247, 0.35);
       border-radius: 8px;
       color: #4fc3f7;
       font-family: inherit;
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
+      transition: all 0.2s;
     }
 
-    #connectBtn:hover { background: rgba(79, 195, 247, 0.25); }
+    #connectBtn:hover { background: rgba(79, 195, 247, 0.22); }
     #connectBtn:disabled { opacity: 0.4; cursor: not-allowed; }
 
     #authError {
       color: #ef5350;
       font-size: 12px;
-      margin-top: 10px;
+      margin-top: 12px;
       display: none;
     }
 
-    #debugLog {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      max-height: 160px;
-      overflow-y: auto;
-      background: rgba(0, 0, 0, 0.9);
-      padding: 10px 14px;
-      font-family: "SF Mono", "Fira Code", monospace;
-      font-size: 11px;
-      line-height: 1.6;
-      color: #aaa;
-      z-index: 9999;
-      border-top: 1px solid rgba(79, 195, 247, 0.3);
+    /* ── Loading spinner (inside video area) ── */
+    #videoLoading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 10;
+      transition: opacity 0.4s ease;
     }
 
-    #debugLog .log-ok { color: #66bb6a; }
-    #debugLog .log-warn { color: #ffa726; }
-    #debugLog .log-err { color: #ef5350; }
-    #debugLog .log-info { color: #4fc3f7; }
+    #videoLoading.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .vid-spinner {
+      width: 32px; height: 32px;
+      border: 3px solid rgba(255, 255, 255, 0.08);
+      border-top-color: #4fc3f7;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -224,40 +277,29 @@
 
     <div id="videoContainer">
       <video id="videoPlayer" controls autoplay muted playsinline></video>
+      <div id="liveBadge"><span class="live-dot"></span> Live</div>
+      <div id="videoLoading" class="hidden"><div class="vid-spinner"></div></div>
     </div>
 
     <div id="authScreen">
       <div class="auth-card">
-        <h2>Connect to Video Server</h2>
-        <p>This app requires a token from the GeoXC Enterprise portal.</p>
+        <h2>Video Server</h2>
+        <div class="subtitle">GeoXC Enterprise Portal</div>
+        <p>Generate a token to connect to the livestream feeds.</p>
         <ol>
           <li>Open the <a href="https://geoxc-ecs.esri.com/portal/sharing/rest/generateToken" target="_blank">Token Generator</a></li>
           <li>Sign in with your portal credentials</li>
-          <li>Set <strong>Webapp URL</strong> to: <code>https://amandastanko.github.io</code></li>
-          <li>Click <strong>Generate Token</strong></li>
-          <li>Copy and paste the token below</li>
+          <li>Set Webapp URL to <code>https://amandastanko.github.io</code></li>
+          <li>Copy the generated token</li>
         </ol>
-        <input type="text" id="tokenInput" placeholder="Paste your token here…" autocomplete="off" />
+        <input type="text" id="tokenInput" placeholder="Paste token here…" autocomplete="off" />
         <button id="connectBtn">Connect</button>
         <p id="authError"></p>
       </div>
     </div>
   </div>
 
-  <div id="debugLog"></div>
-
   <script>
-    var logEl = document.getElementById("debugLog");
-    function log(msg, type) {
-      type = type || "info";
-      var div = document.createElement("div");
-      div.className = "log-" + type;
-      div.textContent = "[" + new Date().toLocaleTimeString() + "] " + msg;
-      logEl.appendChild(div);
-      logEl.scrollTop = logEl.scrollHeight;
-      console.log("[VP]", msg);
-    }
-
     var VIDEO_SERVER = "https://geoxc-ecs-video.esri.com/server/rest/services";
 
     var feeds = {
@@ -274,6 +316,8 @@
     var connectBtn = document.getElementById("connectBtn");
     var authError = document.getElementById("authError");
     var videoEl = document.getElementById("videoPlayer");
+    var liveBadge = document.getElementById("liveBadge");
+    var videoLoading = document.getElementById("videoLoading");
 
     connectBtn.addEventListener("click", handleConnect);
     tokenInput.addEventListener("keydown", function (e) {
@@ -288,22 +332,18 @@
       connectBtn.textContent = "Connecting…";
       authError.style.display = "none";
 
-      log("Testing token…");
-
       try {
         var metaUrl = VIDEO_SERVER + "/" + feeds.collaboration.service + "?f=json&token=" + token;
         var resp = await fetch(metaUrl);
         var data = await resp.json();
-        if (data.error) throw new Error(data.error.message || "Token rejected");
+        if (data.error) throw new Error(data.error.message || "Invalid token");
 
-        log("Token valid! Service: " + data.serviceName, "ok");
         currentToken = token;
         authScreen.classList.add("hidden");
         await loadFeed("collaboration");
 
       } catch (err) {
-        log("Failed: " + err.message, "err");
-        showError("Failed: " + err.message);
+        showError(err.message);
         connectBtn.disabled = false;
         connectBtn.textContent = "Connect";
       }
@@ -317,27 +357,21 @@
     async function loadFeed(feedKey) {
       var feed = feeds[feedKey];
       var baseUrl = VIDEO_SERVER + "/" + feed.service;
-      log("Loading feed: " + feed.label);
+
+      videoLoading.classList.remove("hidden");
+      liveBadge.classList.remove("visible");
 
       try {
-        // Get layer 0 metadata
-        var layerUrl = baseUrl + "/0?f=json&token=" + currentToken;
-        var layerResp = await fetch(layerUrl);
+        var layerResp = await fetch(baseUrl + "/0?f=json&token=" + currentToken);
         var layerData = await layerResp.json();
 
-        log("Layer type: " + layerData.serviceType, "info");
-        log("Active: " + (layerData.livestreamInfo ? layerData.livestreamInfo.active : "n/a"), "info");
-
-        // Extract the HLS URL from connectionUrl.hls
+        // Extract HLS URL from connectionUrl.hls
         var hlsUrl = null;
 
         if (layerData.connectionUrl) {
-          log("connectionUrl found: " + JSON.stringify(layerData.connectionUrl), "ok");
-
           if (typeof layerData.connectionUrl === "string") {
             hlsUrl = layerData.connectionUrl;
           } else if (typeof layerData.connectionUrl === "object") {
-            // connectionUrl is an object — look for hls, hlsUrl, or url properties
             hlsUrl = layerData.connectionUrl.hls
                   || layerData.connectionUrl.hlsUrl
                   || layerData.connectionUrl.url
@@ -345,23 +379,17 @@
           }
         }
 
-        // Fallback: construct the known URL pattern
+        // Fallback pattern
         if (!hlsUrl) {
           hlsUrl = baseUrl + "/0/content/ABR.m3u8";
-          log("No connectionUrl found — using default pattern: " + hlsUrl, "warn");
         }
 
-        log("HLS URL: " + hlsUrl, "ok");
-
-        // Append token
-        var tokenSep = hlsUrl.indexOf("?") > -1 ? "&" : "?";
-        var fullUrl = hlsUrl + tokenSep + "token=" + currentToken;
-
-        log("Playing stream…", "ok");
-        playHls(fullUrl);
+        var sep = hlsUrl.indexOf("?") > -1 ? "&" : "?";
+        playHls(hlsUrl + sep + "token=" + currentToken);
 
       } catch (err) {
-        log("loadFeed error: " + err.message, "err");
+        videoLoading.classList.add("hidden");
+        console.error("Feed load error:", err);
       }
     }
 
@@ -373,12 +401,10 @@
 
       if (Hls.isSupported()) {
         var hls = new Hls({
-          debug: false,
           enableWorker: true,
           liveSyncDurationCount: 3,
           liveMaxLatencyDurationCount: 6,
           xhrSetup: function (xhr, reqUrl) {
-            // Ensure token is on every segment/manifest request
             if (reqUrl.indexOf("token=") === -1 && currentToken) {
               var sep = reqUrl.indexOf("?") > -1 ? "&" : "?";
               xhr.open("GET", reqUrl + sep + "token=" + currentToken, true);
@@ -389,35 +415,18 @@
         hls.loadSource(url);
         hls.attachMedia(videoEl);
 
-        hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
-          log("HLS manifest parsed! Levels: " + data.levels.length, "ok");
-          videoEl.play().catch(function (e) {
-            log("Autoplay blocked — click play: " + e.message, "warn");
-          });
-        });
-
-        hls.on(Hls.Events.LEVEL_LOADED, function (event, data) {
-          log("Level loaded. Live: " + data.details.live + " | Fragments: " + data.details.fragments.length, "ok");
-        });
-
-        hls.on(Hls.Events.FRAG_LOADED, function (event, data) {
-          log("Fragment loaded: " + data.frag.sn, "ok");
+        hls.on(Hls.Events.MANIFEST_PARSED, function () {
+          videoLoading.classList.add("hidden");
+          liveBadge.classList.add("visible");
+          videoEl.play().catch(function () {});
         });
 
         hls.on(Hls.Events.ERROR, function (event, data) {
-          log("HLS error: " + data.type + " / " + data.details, "err");
-          if (data.response) {
-            log("  HTTP status: " + data.response.code, "err");
-          }
           if (data.fatal) {
             if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-              log("Fatal network error — retrying…", "warn");
               hls.startLoad();
             } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-              log("Fatal media error — recovering…", "warn");
               hls.recoverMediaError();
-            } else {
-              log("Fatal error — cannot recover", "err");
             }
           }
         });
@@ -426,10 +435,11 @@
 
       } else if (videoEl.canPlayType("application/vnd.apple.mpegurl")) {
         videoEl.src = url;
-        videoEl.addEventListener("loadedmetadata", function () { videoEl.play(); });
-        log("Using native HLS (Safari)", "info");
-      } else {
-        log("HLS not supported in this browser", "err");
+        videoEl.addEventListener("loadedmetadata", function () {
+          videoLoading.classList.add("hidden");
+          liveBadge.classList.add("visible");
+          videoEl.play();
+        });
       }
     }
 
